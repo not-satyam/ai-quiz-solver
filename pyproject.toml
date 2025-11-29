@@ -1,0 +1,38 @@
+[project]
+name = "tdsproject2"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "playwright>=1.56.0",
+    "beautifulsoup4>=4.14.2",
+    "langgraph>=1.0.3",
+    "langchain>=0.2.0",
+    "langchain-community>=0.2.0",
+    "langchain-google-genai>=1.0.0",
+    "google-genai>=0.17.0",
+    "jsonpatch>=1.33",
+    "python-dotenv>=1.2.1",
+    "pandas>=2.3.3",
+    "fastapi>=0.121.3",
+    "uvicorn>=0.38.0",
+    "requests>=2.32.5",
+    "pillow>=12.0.0",
+    "pytesseract>=0.3.13",
+    "speechrecognition>=3.14.4",
+    "pydub>=0.25.1",
+    "geopy>=2.4.1",
+    "scikit-learn>=1.7.2",
+    "matplotlib>=3.10.7",
+    "pypdf2>=3.0.1",
+    "ffmpeg-python>=0.2.0",
+    "numpy>=2.3.5",
+    "networkx>=3.6",
+    "fuzzywuzzy>=0.18.0",
+    "python-levenshtein>=0.27.3",
+    "duckdb>=1.4.2",
+    "pypdf>=6.4.0",
+    "scipy>=1.16.3",
+    "haversine>=2.9.0",
+]
