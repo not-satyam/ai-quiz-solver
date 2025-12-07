@@ -66,7 +66,7 @@ rate_limiter = InMemoryRateLimiter(
 
 llm = init_chat_model(
     model_provider="google_genai",
-    model="gemini-1.5-flash-001",
+    model="gemini-2.5-flash",
     rate_limiter=rate_limiter
 ).bind_tools(TOOLS)
 
