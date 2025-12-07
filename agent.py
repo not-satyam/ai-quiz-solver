@@ -15,6 +15,26 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
+
+def local_token_counter(messages) -> int:
+    """
+    Estimates tokens locally (1 token ≈ 4 characters) to avoid 
+    API calls and 404 errors from Google's countTokens endpoint.
+    """
+    total_chars = 0
+    for msg in messages:
+        content = getattr(msg, "content", "")
+        if isinstance(content, str):
+            total_chars += len(content)
+        elif isinstance(content, list):
+            # Handle complex content (like images/text mixed)
+            for item in content:
+                if isinstance(item, dict):
+                    total_chars += len(str(item.get("text", "")))
+    
+    return total_chars // 4
+
+
 EMAIL = os.getenv("EMAIL")
 SECRET = os.getenv("SECRET")
 
@@ -134,7 +154,7 @@ def agent_node(state: AgentState):
         strategy="last",
         include_system=True,
         start_on="human",
-        token_counter=llm, 
+        token_counter=local_token_counter, 
     )
     
     # Better check: Does it have a HumanMessage?
