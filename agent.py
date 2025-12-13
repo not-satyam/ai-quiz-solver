@@ -13,10 +13,13 @@ from langchain.chat_models import init_chat_model
 from langgraph.graph.message import add_messages
 import os
 from dotenv import load_dotenv
+
+# Load env vars (local development only; HF loads them automatically)
 load_dotenv()
 
 EMAIL = os.getenv("EMAIL")
 SECRET = os.getenv("SECRET")
+AIPIPE_KEY = os.getenv("AIPIPE_KEY") # Ensure this is set in HF Secrets
 
 RECURSION_LIMIT = 5000
 MAX_TOKENS = 60000
@@ -36,7 +39,7 @@ TOOLS = [
 
 
 # -------------------------------------------------
-# LLM INIT
+# LLM INIT (SWITCHED TO AIPIPE)
 # -------------------------------------------------
 rate_limiter = InMemoryRateLimiter(
     requests_per_second=4 / 60,
@@ -44,10 +47,15 @@ rate_limiter = InMemoryRateLimiter(
     max_bucket_size=4
 )
 
+# AIpipe uses the OpenAI protocol. We use the "openai" provider
+# but point the base_url to AIpipe's server.
 llm = init_chat_model(
-    model_provider="google_genai",
-    model="gemini-2.5-flash",
-    rate_limiter=rate_limiter
+    model="gemini-1.5-flash",    # Check AIpipe docs for the exact model name you want
+    model_provider="openai",      # Must be "openai" for compatible proxies
+    api_key=AIPIPE_KEY,
+    base_url="https://api.aipipe.ai/v1",
+    rate_limiter=rate_limiter,
+    temperature=0
 ).bind_tools(TOOLS)
 
 
@@ -120,10 +128,9 @@ def agent_node(state: AgentState):
             Immediately call the `post_request` tool and submit a WRONG answer for the CURRENT quiz.
             """
 
-            # Using HumanMessage (as you correctly implemented)
             fail_msg = HumanMessage(content=fail_instruction)
 
-            # We invoke the LLM immediately with this new instruction
+            # Invoke LLM immediately with this new instruction
             result = llm.invoke(state["messages"] + [fail_msg])
             return {"messages": [result]}
     # --- TIME HANDLING END ---
@@ -137,18 +144,14 @@ def agent_node(state: AgentState):
         token_counter=llm, 
     )
     
-    # Better check: Does it have a HumanMessage?
+    # Ensure context isn't empty
     has_human = any(msg.type == "human" for msg in trimmed_messages)
     
     if not has_human:
         print("WARNING: Context was trimmed too far. Injecting state reminder.")
-        # We remind the agent of the current URL from the environment
         current_url = os.getenv("url", "Unknown URL")
         reminder = HumanMessage(content=f"Context cleared due to length. Continue processing URL: {current_url}")
-        
-        # We append this to the trimmed list (temporarily for this invoke)
         trimmed_messages.append(reminder)
-    # ----------------------------------------
 
     print(f"--- INVOKING AGENT (Context: {len(trimmed_messages)} items) ---")
     
@@ -158,7 +161,7 @@ def agent_node(state: AgentState):
 
 
 # -------------------------------------------------
-# ROUTE LOGIC (UPDATED FOR MALFORMED CALLS)
+# ROUTE LOGIC
 # -------------------------------------------------
 def route(state):
     last = state["messages"][-1]
@@ -192,24 +195,21 @@ def route(state):
 # -------------------------------------------------
 graph = StateGraph(AgentState)
 
-# Add Nodes
 graph.add_node("agent", agent_node)
 graph.add_node("tools", ToolNode(TOOLS))
-graph.add_node("handle_malformed", handle_malformed_node) # Add the repair node
+graph.add_node("handle_malformed", handle_malformed_node) 
 
-# Add Edges
 graph.add_edge(START, "agent")
 graph.add_edge("tools", "agent")
-graph.add_edge("handle_malformed", "agent") # Retry loop
+graph.add_edge("handle_malformed", "agent") 
 
-# Conditional Edges
 graph.add_conditional_edges(
     "agent", 
     route,
     {
         "tools": "tools",
         "agent": "agent",
-        "handle_malformed": "handle_malformed", # Map the new route
+        "handle_malformed": "handle_malformed",
         END: END
     }
 )
@@ -221,7 +221,6 @@ app = graph.compile()
 # RUNNER
 # -------------------------------------------------
 def run_agent(url: str):
-    # system message is seeded ONCE here
     initial_messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": url}
