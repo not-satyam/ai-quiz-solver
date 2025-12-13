@@ -137,11 +137,11 @@ def agent_node(state: AgentState):
 
     trimmed_messages = trim_messages(
         messages=state["messages"],
-        max_tokens=MAX_TOKENS,
+        max_tokens=50,
         strategy="last",
         include_system=True,
         start_on="human",
-        token_counter=llm, 
+        token_counter=len, 
     )
     
     # Ensure context isn't empty
