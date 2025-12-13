@@ -1,0 +1,65 @@
+{
+  "info": {
+    "name": "LLM Analysis Quiz Solver",
+    "description": "Test requests for the autonomous quiz solver"
+  },
+  "requests": [
+    {
+      "name": "Demo Quiz 1",
+      "method": "POST",
+      "url": "http://localhost:7860/solve",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "email": "your.email@example.com",
+        "secret": "your_secret_string", 
+        "url": "https://tds-llm-analysis.s-anand.net/demo"
+      }
+    },
+    {
+      "name": "Demo Quiz 2", 
+      "method": "POST",
+      "url": "http://localhost:7860/solve",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "email": "your.email@example.com",
+        "secret": "your_secret_string",
+        "url": "https://tds-llm-analysis.s-anand.net/demo2"
+      }
+    },
+    {
+      "name": "Basic Test Quiz",
+      "method": "POST", 
+      "url": "http://localhost:7860/solve",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "email": "your.email@example.com",
+        "secret": "your_secret_string",
+        "url": "https://tdsbasictest.vercel.app/quiz/1"
+      }
+    },
+    {
+      "name": "P2 Testing Quiz",
+      "method": "POST",
+      "url": "http://localhost:7860/solve", 
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "email": "your.email@example.com",
+        "secret": "your_secret_string",
+        "url": "https://p2testingone.vercel.app/q1.html"
+      }
+    },
+    {
+      "name": "Health Check",
+      "method": "GET",
+      "url": "http://localhost:7860/healthz"
+    }
+  ]
+}
