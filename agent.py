@@ -8,12 +8,11 @@ from tools import (
     run_code, add_dependencies, ocr_image_tool, transcribe_audio, encode_image_to_base64
 )
 from typing import TypedDict, Annotated, List
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import trim_messages, HumanMessage
 from langchain.chat_models import init_chat_model
 from langgraph.graph.message import add_messages
 import os
 from dotenv import load_dotenv
-
 load_dotenv()
 
 EMAIL = os.getenv("EMAIL")
@@ -45,10 +44,9 @@ rate_limiter = InMemoryRateLimiter(
     max_bucket_size=4
 )
 
-# FIXED: Using 1.5-flash for higher rate limits (1500/day)
 llm = init_chat_model(
     model_provider="google_genai",
-    model="gemini-1.5-flash",
+    model="gemini-2.5-flash",
     rate_limiter=rate_limiter
 ).bind_tools(TOOLS)
 
@@ -99,7 +97,7 @@ def handle_malformed_node(state: AgentState):
 
 
 # -------------------------------------------------
-# AGENT NODE (FIXED)
+# AGENT NODE
 # -------------------------------------------------
 def agent_node(state: AgentState):
     # --- TIME HANDLING START ---
@@ -122,26 +120,45 @@ def agent_node(state: AgentState):
             Immediately call the `post_request` tool and submit a WRONG answer for the CURRENT quiz.
             """
 
+            # Using HumanMessage (as you correctly implemented)
             fail_msg = HumanMessage(content=fail_instruction)
+
+            # We invoke the LLM immediately with this new instruction
             result = llm.invoke(state["messages"] + [fail_msg])
             return {"messages": [result]}
     # --- TIME HANDLING END ---
 
-    # --- CRITICAL FIX ---
-    # We REMOVED trim_messages here. 
-    # This prevents the "404 Not Found" error caused by token counting on 1.5-flash.
-    # We pass the full history directly.
-    messages_to_send = state["messages"]
-
-    print(f"--- INVOKING AGENT (Context: {len(messages_to_send)} items) ---")
+    trimmed_messages = trim_messages(
+        messages=state["messages"],
+        max_tokens=MAX_TOKENS,
+        strategy="last",
+        include_system=True,
+        start_on="human",
+        token_counter=llm, 
+    )
     
-    result = llm.invoke(messages_to_send)
+    # Better check: Does it have a HumanMessage?
+    has_human = any(msg.type == "human" for msg in trimmed_messages)
+    
+    if not has_human:
+        print("WARNING: Context was trimmed too far. Injecting state reminder.")
+        # We remind the agent of the current URL from the environment
+        current_url = os.getenv("url", "Unknown URL")
+        reminder = HumanMessage(content=f"Context cleared due to length. Continue processing URL: {current_url}")
+        
+        # We append this to the trimmed list (temporarily for this invoke)
+        trimmed_messages.append(reminder)
+    # ----------------------------------------
+
+    print(f"--- INVOKING AGENT (Context: {len(trimmed_messages)} items) ---")
+    
+    result = llm.invoke(trimmed_messages)
 
     return {"messages": [result]}
 
 
 # -------------------------------------------------
-# ROUTE LOGIC
+# ROUTE LOGIC (UPDATED FOR MALFORMED CALLS)
 # -------------------------------------------------
 def route(state):
     last = state["messages"][-1]
@@ -178,12 +195,12 @@ graph = StateGraph(AgentState)
 # Add Nodes
 graph.add_node("agent", agent_node)
 graph.add_node("tools", ToolNode(TOOLS))
-graph.add_node("handle_malformed", handle_malformed_node)
+graph.add_node("handle_malformed", handle_malformed_node) # Add the repair node
 
 # Add Edges
 graph.add_edge(START, "agent")
 graph.add_edge("tools", "agent")
-graph.add_edge("handle_malformed", "agent")
+graph.add_edge("handle_malformed", "agent") # Retry loop
 
 # Conditional Edges
 graph.add_conditional_edges(
@@ -192,7 +209,7 @@ graph.add_conditional_edges(
     {
         "tools": "tools",
         "agent": "agent",
-        "handle_malformed": "handle_malformed",
+        "handle_malformed": "handle_malformed", # Map the new route
         END: END
     }
 )
