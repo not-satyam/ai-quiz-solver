@@ -1,18 +1,21 @@
-from google import genai
+# run_code.py
 import subprocess
 from langchain_core.tools import tool
 from dotenv import load_dotenv
 import os
-from google.genai import types
+
 load_dotenv()
-client = genai.Client()
 
 def strip_code_fences(code: str) -> str:
     code = code.strip()
     # Remove ```python ... ``` or ``` ... ```
     if code.startswith("```"):
         # remove first line (```python or ```)
-        code = code.split("\n", 1)[1]
+        try:
+            code = code.split("\n", 1)[1]
+        except IndexError:
+            # If there's no newline after the fence, just return empty or original
+            pass
     if code.endswith("```"):
         code = code.rsplit("\n", 1)[0]
     return code.strip()
@@ -42,6 +45,9 @@ def run_code(code: str) -> dict:
         }
     """
     try: 
+        # Clean up the code if the LLM wrapped it in markdown
+        code = strip_code_fences(code)
+        
         filename = "runner.py"
         os.makedirs("LLMFiles", exist_ok=True)
         with open(os.path.join("LLMFiles", filename), "w") as f:
@@ -55,11 +61,13 @@ def run_code(code: str) -> dict:
             cwd="LLMFiles"
         )
         stdout, stderr = proc.communicate()
+        
+        # Truncate output to prevent token overflow
         if len(stdout) >= 10000:
-            return stdout[:10000] + "...truncated due to large size"
+            stdout = stdout[:10000] + "...truncated due to large size"
         if len(stderr) >= 10000:
-            return stderr[:10000] + "...truncated due to large size"
-        # --- Step 4: Return everything ---
+            stderr = stderr[:10000] + "...truncated due to large size"
+            
         return {
             "stdout": stdout,
             "stderr": stderr,
